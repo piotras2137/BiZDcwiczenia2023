@@ -1,171 +1,212 @@
--- zadanie 1
-CREATE OR REPLACE FUNCTION obfuscated_function(identifier IN VARCHAR2)
+-- FUNKCJE 1
+CREATE OR REPLACE FUNCTION get_job_title(job_id_param IN VARCHAR2)
     RETURN VARCHAR2
 IS
-    v_result jobs.job_title%TYPE;
+    v_job_title jobs.job_title%TYPE;
 BEGIN
     SELECT job_title
-    INTO v_result
+    INTO v_job_title
     FROM jobs
-    WHERE job_id = identifier;
+    WHERE job_id = job_id_param;
 
-    RETURN v_result;
+    RETURN v_job_title;
 EXCEPTION
     WHEN NO_DATA_FOUND THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Błąd: Nie znaleziono pasującej pozycji');
+    RAISE_APPLICATION_ERROR(-20001, 'Praca o podanym ID nie istnieje');
 END;
-
+-- TEST
 DECLARE
-    v_output VARCHAR2(100);
+  v_job_title VARCHAR2(100);
 BEGIN
-    v_output := obfuscated_function('IT_PROG');
-    DBMS_OUTPUT.PUT_LINE('Rezultat: ' || v_output);
+  v_job_title := get_job_title('AD_PRES');
+  DBMS_OUTPUT.PUT_LINE('Nazwa pracy: ' || v_job_title);
 EXCEPTION
-    WHEN OTHERS THEN
-        DBMS_OUTPUT.PUT_LINE('Błąd: ' || SQLERRM);
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('Błąd: ' || SQLERRM);
 END;
 
--- zadanie 2
 
-CREATE OR REPLACE FUNCTION calculate_annual_earnings(employee_id_param IN NUMBER)
-    RETURN NUMBER
+-- FUNKCJE 2
+CREATE OR REPLACE FUNCTION calculate_annual_income(employee_id_param IN NUMBER)
+RETURN NUMBER
 IS
-    v_salary employees.salary%TYPE;
-    v_commission_pct employees.commission_pct%TYPE;
-    v_annual_earnings NUMBER;
+  v_salary NUMBER;
+  v_commission_pct NUMBER;
+  v_annual_income NUMBER;
 BEGIN
-    -- Pobieramy wynagrodzenie i premię pracownika na podstawie ID
-    SELECT salary, commission_pct
-    INTO v_salary, v_commission_pct
-    FROM employees
-    WHERE employee_id = employee_id_param;
+  SELECT salary, commission_pct
+  INTO v_salary, v_commission_pct
+  FROM employees
+  WHERE employee_id = employee_id_param;
 
-    -- Obliczamy roczne zarobki (wynagrodzenie 12-miesięczne plus premia)
-    v_annual_earnings := v_salary * 12 + (v_salary * v_commission_pct);
+  v_annual_income := v_salary * 12;
 
-    RETURN v_annual_earnings;
+  IF v_commission_pct IS NOT NULL THEN
+    v_annual_income := v_annual_income + (v_salary * v_commission_pct);
+  END IF;
+
+  RETURN v_annual_income;
 EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Błąd: Pracownik o podanym ID nie istnieje');
+  WHEN NO_DATA_FOUND THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Pracownik o podanym ID nie istnieje');
 END;
-
-
--- zadanie 3
-CREATE OR REPLACE FUNCTION extract_area_code(phone_number IN VARCHAR2)
-    RETURN VARCHAR2
-IS
-    v_area_code VARCHAR2(10);
+-- TEST
+DECLARE
+  v_annual_income NUMBER;
 BEGIN
-    -- Sprawdzamy, czy numer telefonu ma odpowiednią długość i format
-    IF LENGTH(phone_number) >= 9 AND REGEXP_LIKE(phone_number, '^\+\d{1,4}-\d{2,8}$') THEN
-        -- Wyodrębniamy numer kierunkowy z numeru telefonu
-        v_area_code := SUBSTR(phone_number, 2, INSTR(phone_number, '-') - 2);
-        RETURN v_area_code;
-    ELSE
-        RAISE_APPLICATION_ERROR(-20002, 'Błąd: Nieprawidłowy format numeru telefonu');
-    END IF;
+  v_annual_income := calculate_annual_income(101);
+  DBMS_OUTPUT.PUT_LINE('Roczne zarobki pracownika: ' || v_annual_income);
 EXCEPTION
-    WHEN OTHERS THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Błąd: Nie udało się wyodrębnić numeru kierunkowego');
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('Błąd: ' || SQLERRM);
 END;
-/
 
--- zadanie 4
-CREATE OR REPLACE FUNCTION format_name_case(input_string IN VARCHAR2)
-    RETURN VARCHAR2
+
+-- FUNKCJE 3
+CREATE OR REPLACE FUNCTION get_area_code(phone_number_param IN VARCHAR2)
+RETURN VARCHAR2
 IS
-    v_result VARCHAR2(255);
+  v_area_code VARCHAR2(10);
 BEGIN
-    -- Sprawdzamy, czy podany ciąg znaków jest niepusty
-    IF input_string IS NOT NULL THEN
-        -- Konwertujemy wszystkie litery na małe
-        v_result := LOWER(input_string);
+  SELECT REGEXP_SUBSTR(phone_number_param, '^\+?\d{1,4}') 
+  INTO v_area_code
+  FROM dual;
 
-        -- Zmieniamy pierwszą i ostatnią literę na wielkie
-        v_result := INITCAP(v_result);
-
-        RETURN v_result;
-    ELSE
-        RAISE_APPLICATION_ERROR(-20002, 'Błąd: Podany ciąg znaków jest pusty');
-    END IF;
+  RETURN v_area_code;
+END;
+-- TEST
+DECLARE
+  v_area_code VARCHAR2(10);
+BEGIN
+  v_area_code := get_area_code('+48-522-456-790');
+  DBMS_OUTPUT.PUT_LINE('Numer kierunkowy: ' || v_area_code);
 EXCEPTION
-    WHEN OTHERS THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Błąd: Nie udało się przekształcić ciągu znaków');
+  WHEN OTHERS THEN
+    DBMS_OUTPUT.PUT_LINE('Błąd: ' || SQLERRM);
 END;
 
--- zadanie 5
-CREATE OR REPLACE FUNCTION pesel_to_birthdate(pesel IN VARCHAR2)
-    RETURN VARCHAR2
+
+-- FUNKCJE 4
+CREATE OR REPLACE FUNCTION capitalize_first_last(str IN VARCHAR2) RETURN VARCHAR2
 IS
-    v_year VARCHAR2(4);
-    v_month VARCHAR2(2);
-    v_day VARCHAR2(2);
-    v_birthdate VARCHAR2(10);
+  v_result VARCHAR2(4000);
 BEGIN
-    -- Sprawdzamy, czy PESEL ma poprawną długość
-    IF LENGTH(pesel) = 11 THEN
-        -- Wyodrębniamy rok, miesiąc i dzień z PESEL
-        v_year := SUBSTR(pesel, 1, 2);
-        v_month := SUBSTR(pesel, 3, 2);
-        v_day := SUBSTR(pesel, 5, 2);
+  IF str IS NULL THEN
+    RETURN NULL;
+  END IF;
+  
+  v_result := LOWER(str);
 
-        -- Dodajemy "19" lub "20" na początku roku w zależności od cyfry miesiąca
-        IF TO_NUMBER(v_month) <= 12 THEN
-            v_year := '19' || v_year;
-        ELSE
-            v_year := '20' || v_year;
-        END IF;
+  IF LENGTH(v_result) >= 2 THEN
+    v_result := INITCAP(SUBSTR(v_result, 1, 1)) || SUBSTR(v_result, 2, LENGTH(v_result) - 2) || INITCAP(SUBSTR(v_result, -1));
+  ELSE
+    v_result := INITCAP(v_result);
+  END IF;
 
-        -- Tworzymy datę urodzenia w formacie 'yyyy-mm-dd'
-        v_birthdate := v_year || '-' || v_month || '-' || v_day;
+  RETURN v_result;
+END;
+-- TEST
+DECLARE
+  v_input VARCHAR2(100);
+  v_output VARCHAR2(100);
+BEGIN
+  v_input := 'aLa Ma KoTa';
+  v_output := capitalize_first_last(v_input);
+  DBMS_OUTPUT.PUT_LINE('Wynik: ' || v_output);
+END;
 
-        RETURN v_birthdate;
-    ELSE
-        RAISE_APPLICATION_ERROR(-20002, 'Błąd: Nieprawidłowa długość numeru PESEL');
-    END IF;
+
+-- FUNKCJE 5
+CREATE OR REPLACE FUNCTION pesel_to_birthdate(pesel_param IN VARCHAR2) 
+RETURN VARCHAR2
+IS
+  v_birthdate VARCHAR2(11);
+  v_year NUMBER;
+  v_month NUMBER;
+  v_day NUMBER;
+BEGIN
+  IF LENGTH(pesel_param) <> 11 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Nieprawidłowa długość numeru PESEL');
+  END IF;
+
+  v_year := TO_NUMBER(SUBSTR(pesel_param, 1, 2));
+  v_month := TO_NUMBER(SUBSTR(pesel_param, 3, 2));
+  v_day := TO_NUMBER(SUBSTR(pesel_param, 5, 2));
+
+  IF v_month < 20 THEN
+    v_year := v_year + 1900;
+  ELSE
+    v_year := v_year + 2000;
+  END IF;
+  
+  v_birthdate := TRIM(TO_CHAR(v_year, '0000')) || '-' || TRIM(TO_CHAR(v_month, '00')) || '-' || TRIM(TO_CHAR(v_day, '00'));
+
+  RETURN v_birthdate;
 EXCEPTION
-    WHEN OTHERS THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Błąd: Nie udało się przekształcić numeru PESEL na datę urodzenia');
+  WHEN OTHERS THEN
+    RAISE_APPLICATION_ERROR(-20002, 'Błąd: ' || SQLERRM);
 END;
-/
-
--- zadanie 6
-CREATE OR REPLACE FUNCTION count_employees_and_departments_in_country(country_name IN VARCHAR2)
-    RETURN VARCHAR2
-IS
-    v_employee_count NUMBER;
-    v_department_count NUMBER;
+-- TEST
+DECLARE
+  v_pesel VARCHAR2(11);
+  v_birthdate VARCHAR2(10);
 BEGIN
-    -- Liczymy liczbę pracowników w danym kraju
-    SELECT COUNT(*) INTO v_employee_count
-    FROM employees e
-    WHERE e.department_id IN (SELECT d.department_id FROM departments d WHERE d.location_id IN (SELECT l.location_id FROM locations l WHERE l.country_name = country_name));
-
-    -- Liczymy liczbę departamentów w danym kraju
-    SELECT COUNT(*) INTO v_department_count
-    FROM departments d
-    WHERE d.location_id IN (SELECT l.location_id FROM locations l WHERE l.country_name = country_name);
-
-    IF v_employee_count = 0 AND v_department_count = 0 THEN
-        RAISE_APPLICATION_ERROR(-20001, 'Błąd: Brak pracowników i departamentów w podanym kraju');
-    ELSE
-        RETURN 'Liczba pracowników: ' || v_employee_count || ', Liczba departamentów: ' || v_department_count;
-    END IF;
+  v_pesel := '99052421433';
+  v_birthdate := pesel_to_birthdate(v_pesel);
+  DBMS_OUTPUT.PUT_LINE('Data urodzenia: ' || v_birthdate);
 END;
-/
 
 
--- Wyzwalacze
--- zadanie 1
+-- FUNKCJE 6
+CREATE OR REPLACE FUNCTION get_employee_department_count(country_name_param IN VARCHAR2)
+RETURN VARCHAR2
+IS
+  v_employee_count NUMBER;
+  v_department_count NUMBER;
+BEGIN
+  SELECT COUNT(*)
+  INTO v_department_count
+  FROM countries c
+  JOIN locations l ON c.country_id = l.country_id
+  JOIN departments d ON d.location_id = l.location_id 
+  WHERE UPPER(country_name) = UPPER(country_name_param);
 
+  IF v_department_count = 0 THEN
+    RAISE_APPLICATION_ERROR(-20001, 'Kraj nie istnieje w bazie danych');
+  END IF;
+
+  SELECT COUNT(*) INTO v_employee_count
+  FROM employees e
+  JOIN departments d ON e.department_id = d.department_id
+  JOIN locations l ON d.location_id = l.location_id
+  JOIN countries c ON l.country_id = c.country_id
+  WHERE UPPER(c.country_name) = UPPER(country_name_param);
+
+  RETURN 'Liczba pracowników: ' || TO_CHAR(v_employee_count) || ', Liczba departamentów: ' || TO_CHAR(v_department_count);
+EXCEPTION
+  WHEN NO_DATA_FOUND THEN
+    RAISE_APPLICATION_ERROR(-20002, 'Brak danych');
+END;
+-- TEST
+DECLARE
+  v_result VARCHAR2(100);
+BEGIN
+  v_result := get_employee_department_count('United States of America');
+  DBMS_OUTPUT.PUT_LINE('Wynik: ' || v_result);
+END;
+
+
+-- WYZWALACZE 1
+DROP TABLE archiwum_departamentow;
+-- TABELA POMOCNICZA
 CREATE TABLE archiwum_departamentow (
     id NUMBER,
-    nazwa VARCHAR2(255),
+    nazwa VARCHAR2(100),
     data_zamkniecia DATE,
-    ostatni_manager VARCHAR2(255)
+    ostatni_manager VARCHAR2(100)
 );
-
-CREATE OR REPLACE TRIGGER archiwizacja_departamentow
+-- WYZWALACZ
+CREATE OR REPLACE TRIGGER archiwum_departamentow_trigger
 AFTER DELETE ON departments
 FOR EACH ROW
 DECLARE
@@ -176,36 +217,40 @@ BEGIN
     INTO v_manager_first_name, v_manager_last_name
     FROM employees
     WHERE employee_id = :OLD.manager_id;
-    INSERT INTO archiwum_departamentow (id, nazwa, data_zamknięcia, ostatni_manager)
+
+    INSERT INTO archiwum_departamentow (id, nazwa, data_zamkniecia, ostatni_manager)
     VALUES (:OLD.department_id, :OLD.department_name, SYSDATE, v_manager_first_name || ' ' || v_manager_last_name);
 END;
 
--- zadanie 2
+
+-- WYZWALACZE 2
+DROP TABLE zlodziej;
+-- TABELA POMOCNICZA
 CREATE TABLE zlodziej (
     id NUMBER,
-    username VARCHAR2(255),
+    "USER" VARCHAR2(100),
     czas_zmiany TIMESTAMP
 );
-
-CREATE OR REPLACE PROCEDURE log_zdarzenie(p_user VARCHAR2, p_time TIMESTAMP)
-AS
+-- SEKWENCJA DO INDEKSOWANIA
+DECLARE
+    v_sequence_exists NUMBER;
 BEGIN
-    INSERT INTO zlodziej (id, username, czas_zmiany)
-    VALUES (seq_zlodziej.nextval, p_user, p_time);
+    SELECT COUNT(*) INTO v_sequence_exists FROM user_sequences WHERE sequence_name = 'ZLODZIEJ_SEQ';
+    
+    IF v_sequence_exists = 0 THEN
+        EXECUTE IMMEDIATE 'CREATE SEQUENCE zlodziej_seq';
+    END IF;
 END;
-
-CREATE OR REPLACE TRIGGER ograniczenie_zarobkow
+-- WYZWALACZ
+CREATE OR REPLACE TRIGGER employees_salary_check_trigger
 BEFORE INSERT OR UPDATE ON employees
 FOR EACH ROW
-DECLARE
-    v_user VARCHAR2(255);
 BEGIN
     IF :NEW.salary < 2000 OR :NEW.salary > 26000 THEN
-        -- Logowanie próby zmiany wynagrodzenia poza widełkami
-        v_user := SYS_CONTEXT('USERENV', 'SESSION_USER');
-        log_zdarzenie(v_user, SYSTIMESTAMP);
-        -- Rzucenie błędu, aby przerwać operację
-        RAISE_APPLICATION_ERROR(-20001, 'Wynagrodzenie poza dozwolonymi widełkami (2000 - 26000).');
+        INSERT INTO zlodziej (id, "USER", czas_zmiany)
+        VALUES (zlodziej_seq.NEXTVAL, USER, SYSTIMESTAMP);
+
+        RAISE_APPLICATION_ERROR(-20001, 'Wynagrodzenie musi być w zakresie  2000 - 26000');
     END IF;
 END;
 
